@@ -80,6 +80,33 @@ Unmarshal into:
     }
 ```
 
+You can send forms to the above web server like so:
+
+``` sh
+curl \
+    -X POST localhost:8080/submit \
+    --data-urlencode "id=4" \
+    --data-urlencode "dynamicData[first]=tavish" \
+    --data-urlencode "dynamicData[last]=degroot"
+
+# => Parsed form: {ID:4 DynamicData:map[first:tavish last:degroot]}
+# => Encoded form: map[dynamicData[first]:[tavish] dynamicData[last]:[degroot] id:[4]]
+```
+
+Undefined keys are ignored:
+
+``` sh
+curl \
+    -X POST localhost:8080/submit \
+    --data-urlencode "id=4" \
+    --data-urlencode "dynamicData[first]=tavish" \
+    --data-urlencode "dynamicData[last]=degroot" \
+    --data-urlencode "city=ullapool" # Not supposed to be there!
+ 
+# => Parsed form: {ID:4 DynamicData:map[first:tavish last:degroot]}
+# => Encoded form: map[dynamicData[first]:[tavish] dynamicData[last]:[degroot] id:[4]]
+```
+
 ## Comparison to `gorilla/schema`
 
 `gorilla/schema` enables marshaling and unmarshaling form values to and from typed structs. However, it does not support dynamic fields that map key/value pairs. This library was created to expand on `gorilla/schema`'s base functionality by supporting typed struct conversion, as well as dynamic data pairs.
