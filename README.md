@@ -47,7 +47,13 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintf(w, "Parsed form: %+v", sample)
+	encodedForm, err := form.Marshal(sample)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	fmt.Fprintf(w, "Parsed form: %+v\nEncoded form: %+v", sample, encodedForm)
 }
 
 func main() {
@@ -56,9 +62,27 @@ func main() {
 }
 ```
 
+Form data is flat, with key/value pairings: `field = val`, where `field` is matched to a struct tag. Forms allow the same key to be reused: `field = val1, field = val2`. Multiple values can be handled by using a slice in the struct. Dynamic values are encoded in the keys with a `field[key] = val` syntax. Use `map[string]<type>` as the struct type to unmarshal these dynamic pairs.
+
+```
+These form values:
+    id:               "123"
+    dynamicData[one]: "val1"
+    dynamicData[two]: "val2"
+
+Unmarshal into:
+    SampleForm {
+        ID: 123,
+        DynamicData: map[string]string{
+            "one": "val1",
+            "two": "val2"
+        }
+    }
+```
+
 ## Comparison to `gorilla/schema`
 
-`gorilla/schema` enables marshaling and unmarshaling form values to and from typed structs. However, it does not support dynamic fields that map key/value pairs. This library was created to extend the base functionality `gorilla/schema` provides by supporting the base typed struct conversion, as well as dynamic data pairs.
+`gorilla/schema` enables marshaling and unmarshaling form values to and from typed structs. However, it does not support dynamic fields that map key/value pairs. This library was created to expand on `gorilla/schema`'s base functionality by supporting typed struct conversion, as well as dynamic data pairs.
 
 ## Benchmarks
 
