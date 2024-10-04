@@ -12,19 +12,30 @@ var (
 	textMarshalerType = reflect.TypeOf((*encoding.TextMarshaler)(nil)).Elem()
 )
 
+// toPtr converts a value to a pointer.
 func toPtr[T any](val T) *T {
 	return &val
 }
 
+// ErrorEncode represents an error that occurs during the encoding process.
 type ErrorEncode struct {
 	fieldName string
 	err       error
 }
 
+// Error returns the error message for ErrorEncode.
 func (e ErrorEncode) Error() string {
 	return fmt.Sprintf("unable to encode tag '%s': %s", e.fieldName, e.err)
 }
 
+// Marshal serializes the provided struct into a map containing form values.
+// `src` is the struct to be serialized, and the resulting map is returned.
+//
+// Example:
+//
+//	var data SampleForm
+//	formData, err := form.Marshal(data)
+//	if err != nil { ...	}
 func Marshal(src any) (map[string][]string, error) {
 	dest := map[string][]string{}
 	err := NewEncoder(dest).Encode(src)
@@ -35,14 +46,18 @@ func Marshal(src any) (map[string][]string, error) {
 	return dest, nil
 }
 
+// Encoder is responsible for encoding struct data into form values.
 type Encoder struct {
 	dest map[string][]string
 }
 
+// NewEncoder creates a new Encoder instance with the given destination map.
 func NewEncoder(dest map[string][]string) *Encoder {
 	return &Encoder{dest: dest}
 }
 
+// Encode serializes the provided struct into the destination map.
+// The `src` must be a struct or a pointer to a struct.
 func (e *Encoder) Encode(src any) error {
 	// Ensure that src is a struct value
 	val := reflect.ValueOf(src)
@@ -57,6 +72,7 @@ func (e *Encoder) Encode(src any) error {
 	return e.encodeStruct(val)
 }
 
+// encodeStruct iterates over the fields of the provided struct and encodes them into form values.
 func (e *Encoder) encodeStruct(src reflect.Value) error {
 	// Iterate over the fields in src
 	srcType := src.Type()
@@ -68,9 +84,8 @@ func (e *Encoder) encodeStruct(src reflect.Value) error {
 
 		formTag, shouldOmitEmpty := parseFieldTag(fieldType)
 		if formTag != "" && formTag != "-" {
-			// Parse based on field type. All field types but map look up their values from src. Map must iterate over
-			// src keys to find all relevant key/value pairs. Map key/value parsing is done once and cached for
-			// additional map fields.
+			// Parse based on field type. All field types but `map` look up their values from src. `map` must iterate
+			// over src keys to find all relevant key/value pairs.
 			fieldVal := src.Field(i)
 
 			err := e.encodeFormField(fieldVal, formTag, shouldOmitEmpty)
@@ -83,6 +98,7 @@ func (e *Encoder) encodeStruct(src reflect.Value) error {
 	return nil
 }
 
+// encodeFormField encodes the form value from the provided struct field based on the form tag.
 func (e *Encoder) encodeFormField(src reflect.Value, formTag string, shouldOmitEmpty bool) error {
 	if src.Type().Implements(textMarshalerType) ||
 		(src.CanAddr() && src.Addr().Type().Implements(textMarshalerType)) {
@@ -150,6 +166,7 @@ func (e *Encoder) encodeFormField(src reflect.Value, formTag string, shouldOmitE
 	return nil
 }
 
+// encodeValue encodes a single value from the struct into the destination form map.
 func (e *Encoder) encodeValue(src reflect.Value, formTag string, shouldOmitEmpty bool) (*string, error) {
 	switch src.Type() {
 	case durationType:
@@ -177,9 +194,9 @@ func (e *Encoder) encodeValue(src reflect.Value, formTag string, shouldOmitEmpty
 			return nil, nil
 		}
 
-		// Recursively call decode() with the pointer's element
+		// Recursively call encodeValue() with the pointer's element
 		// This additional pointer dereferencing is needed to handle slice pointer values. Top-level pointers are
-		// handled in decodeFormField.
+		// handled in encodeFormField.
 		return e.encodeValue(src.Elem(), formTag, shouldOmitEmpty)
 
 	default:
@@ -187,6 +204,7 @@ func (e *Encoder) encodeValue(src reflect.Value, formTag string, shouldOmitEmpty
 	}
 }
 
+// encodeSliceField encodes the form values from the provided slice field.
 func (e *Encoder) encodeSliceField(src reflect.Value, formTag string, shouldOmitEmpty bool) error {
 	if src.Len() == 0 && shouldOmitEmpty {
 		return nil
@@ -202,6 +220,7 @@ func (e *Encoder) encodeSliceField(src reflect.Value, formTag string, shouldOmit
 	return nil
 }
 
+// encodeSliceValue encodes the values from the source slice into the provided destination slice.
 func (e *Encoder) encodeSliceValue(src reflect.Value, formTag string, shouldOmitEmpty bool) ([]string, error) {
 	if src.Len() == 0 && shouldOmitEmpty {
 		return nil, nil
@@ -220,6 +239,7 @@ func (e *Encoder) encodeSliceValue(src reflect.Value, formTag string, shouldOmit
 	return values, nil
 }
 
+// encodeMap encodes the form values from the provided map field.
 func (e *Encoder) encodeMap(src reflect.Value, formTag string, shouldOmitEmpty bool) error {
 	if src.Len() == 0 && shouldOmitEmpty {
 		return nil
@@ -273,6 +293,7 @@ func parseFieldTag(fieldType reflect.StructField) (string, bool) {
 	return tag, false
 }
 
+// isZeroValue checks if the provided value is the zero value for its type.
 func isZeroValue(val reflect.Value) bool {
 	// Maps, slices, structs, and funcs must be checked directly
 	switch val.Kind() {

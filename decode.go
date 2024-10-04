@@ -14,41 +14,53 @@ var (
 	textUnmarshalerType = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
 )
 
+// ErrorDecode represents an error that occurs during the decoding process.
 type ErrorDecode struct {
 	fieldName string
 	err       error
 }
 
+// Error returns the error message for ErrorDecode.
 func (e ErrorDecode) Error() string {
 	return fmt.Sprintf("Unable to decode tag '%s': %s", e.fieldName, e.err)
 }
 
-// Rules:
-//		1. Form data is flat -- the key/value mapping is always at the top level. Keys must contain dynamic encoding.
-//		2. Nested data structures are represented with dot-notation keys. e.g. nestedStruct.Param1, nestedStruct.Param2
-//		3. Dynamic form data is modeled with param[key] = val syntax. `param` matches with the form struct tag. Keys are
-//			parsed and used to populate the map.
-
-// Check if the value slice len > 1. If it is and the value is a slice, parse all values. If the value is not a slice,
-// parse the first value. Add a config option to error on unexpected slice values.
-
-// Map syntax: brackets -- paramName[key] = value
-
-// TODO: Nested struct: Dot syntax. e.g.  nestedStruct.param1, nestedStruct.param2
-
-// Unmarshal iterates over the fields in `dest`, populating them with the appropriate fields from values.
+// Unmarshal iterates over the fields in `dest`, populating them with the appropriate fields from the provided source
+// map. `src` is a map containing form values, and `dest` is a pointer to the struct that will be populated.
+//
+// Example:
+//
+//	var r *http.Request
+//	err := r.ParseForm()
+//	if err != nil { ... }
+//
+//	var submission SampleForm
+//	err := form.Unmarshal(r.Form, &submission)
+//	if err != nil { ... }
+//
+// Form data is flat, with key/value pairings: `field = val`, where `field` is matched to a struct tag. Forms allow the
+// same key to be reused: `field = val1, field = val2`. Multiple values can be handled by using a slice in the struct.
+// Dynamic values are encoded in the keys with a `field[key] = val` syntax. Use `map[string]<type>` as the struct type
+// to unmarshal these dynamic pairs.
+//
+// If multiple form values are provided for a field, parse all values. If the value is not a slice, the first form value
+// is set to the struct's field.
 func Unmarshal(src map[string][]string, dest any) error {
 	return NewDecoder(src).Decode(dest)
 }
 
+// Decoder is responsible for decoding form data from the source map to the provided destination struct.
 type Decoder struct {
 	src map[string][]string
 }
 
+// NewDecoder creates a new Decoder instance with the given source form data.
 func NewDecoder(src map[string][]string) *Decoder {
 	return &Decoder{src: src}
 }
 
+// Decode decodes the form data into the provided destination struct by iterating over the fields in `dest`.
+// The `dest` must be a pointer to a struct.
 func (d *Decoder) Decode(dest any) error {
 	// Ensure dest has a value that is a non-nil pointer to a struct
 	val := reflect.ValueOf(dest)
@@ -67,7 +79,7 @@ func (d *Decoder) Decode(dest any) error {
 	return nil
 }
 
-// dest must be a non-pointer value
+// decodeStruct iterates over the fields of the provided struct and decodes them from form values.
 func (d *Decoder) decodeStruct(dest reflect.Value) error {
 	// Iterate over the fields in dest
 	destType := dest.Type()
@@ -96,18 +108,15 @@ func (d *Decoder) decodeStruct(dest reflect.Value) error {
 	return nil
 }
 
+// decodeFormField decodes the form value into the provided struct field based on the form tag.
 func (d *Decoder) decodeFormField(dest reflect.Value, formTag string) error {
 	if dest.Kind() != reflect.Map && len(d.src[formTag]) == 0 {
 		return nil
 	}
 
-	// Check overridden TextUnmarshaler types first, either the value itself, or a pointer to it.
-	// e.g. *time.Time implements TextUnmarshaler. If a time.Time value is provided, the reference
-	// must be processed.
+	// Check overridden TextUnmarshaler types first.
 	if dest.Type().Implements(textUnmarshalerType) ||
 		(dest.CanAddr() && dest.Addr().Type().Implements(textUnmarshalerType)) {
-		// If the destination itself doesn't implement TextUnmarshaler, take the pointer and recursively call
-		// decodeFormField.
 		if !dest.Type().Implements(textUnmarshalerType) {
 			return d.decodeFormField(dest.Addr(), formTag)
 		}
@@ -125,8 +134,7 @@ func (d *Decoder) decodeFormField(dest reflect.Value, formTag string) error {
 	}
 
 	if dest.Kind() == reflect.Pointer {
-		// Recursively call decode() with the pointer's element
-		// Decode the element the pointer references
+		// Decode the element the pointer references.
 		ensurePointerIsSet(dest)
 		return d.decodeFormField(dest.Elem(), formTag)
 	}
@@ -146,7 +154,7 @@ func (d *Decoder) decodeFormField(dest reflect.Value, formTag string) error {
 		break
 	}
 
-	// Decode value. Take the first value from the source slice
+	// Decode value. Take the first value from the source slice.
 	var strVal string
 	if len(d.src[formTag]) > 0 {
 		strVal = d.src[formTag][0]
@@ -155,10 +163,9 @@ func (d *Decoder) decodeFormField(dest reflect.Value, formTag string) error {
 	return d.decodeValue(dest, strVal, formTag)
 }
 
-// TODO setup decoding for time.time. The primary usecase is for html <input type="time" /> tags
+// decodeValue decodes a single value from the form into the provided destination value.
 func (d *Decoder) decodeValue(dest reflect.Value, rawValue, formTag string) error {
 	switch dest.Type() {
-	// Custom types (duration)
 	case durationType:
 		duration, err := time.ParseDuration(rawValue)
 		if err != nil {
@@ -169,7 +176,6 @@ func (d *Decoder) decodeValue(dest reflect.Value, rawValue, formTag string) erro
 	}
 
 	switch dest.Kind() {
-	// literals
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		i, err := strconv.ParseInt(rawValue, 0, dest.Type().Bits())
 		if err != nil {
@@ -203,9 +209,6 @@ func (d *Decoder) decodeValue(dest reflect.Value, rawValue, formTag string) erro
 		return nil
 
 	case reflect.Pointer:
-		// Recursively call decode() with the pointer's element
-		// This additional pointer dereferencing is needed to handle slice pointer values. Top-level pointers are
-		// handled in decodeFormField.
 		ensurePointerIsSet(dest)
 		return d.decodeValue(dest.Elem(), rawValue, formTag)
 
@@ -216,10 +219,12 @@ func (d *Decoder) decodeValue(dest reflect.Value, rawValue, formTag string) erro
 	return nil
 }
 
+// decodeSliceField decodes the form values into the provided slice field.
 func (d *Decoder) decodeSliceField(dest reflect.Value, formTag string) error {
 	return d.decodeSliceValue(dest, d.src[formTag], formTag)
 }
 
+// decodeSliceValue decodes the values from the source slice into the provided destination slice.
 func (d *Decoder) decodeSliceValue(dest reflect.Value, rawValues []string, formTag string) error {
 	sliceType := dest.Type()
 
@@ -236,6 +241,7 @@ func (d *Decoder) decodeSliceValue(dest reflect.Value, rawValues []string, formT
 	return nil
 }
 
+// decodeMap decodes the form values into the provided map field.
 func (d *Decoder) decodeMap(dest reflect.Value, formTag string) error {
 	regex, err := regexp.Compile(fmt.Sprintf("^%s\\[(.*)]$", formTag))
 	if err != nil {
@@ -245,11 +251,10 @@ func (d *Decoder) decodeMap(dest reflect.Value, formTag string) error {
 	mapType := dest.Type()
 	m := reflect.MakeMap(mapType)
 
-	// Find all src keys that match the form tag
+	// Find all src keys that match the form tag.
 	for rawKey, val := range d.src {
 		captureGroups := regex.FindStringSubmatch(rawKey)
 		if len(captureGroups) == 0 || len(val) == 0 {
-			// Ignore non-matching src keys and empty values
 			continue
 		}
 
@@ -257,7 +262,7 @@ func (d *Decoder) decodeMap(dest reflect.Value, formTag string) error {
 			return ErrorDecode{fieldName: formTag, err: fmt.Errorf("invalid map key: %v", captureGroups)}
 		}
 
-		// Handle single values or slices
+		// Handle single values or slices.
 		sliceType := mapType.Elem()
 		sliceVal := reflect.New(sliceType).Elem()
 		if mapType.Elem().Kind() == reflect.Slice {
@@ -284,7 +289,7 @@ func (d *Decoder) decodeMap(dest reflect.Value, formTag string) error {
 	return nil
 }
 
-// ensurePointer checks if the provided value is a nil pointer, and sets the internal value, if the value is nil.
+// ensurePointerIsSet checks if the provided value is a nil pointer, and sets the internal value if the value is nil.
 func ensurePointerIsSet(val reflect.Value) {
 	if val.Kind() == reflect.Pointer && val.IsNil() {
 		val.Set(reflect.New(val.Type().Elem()))
