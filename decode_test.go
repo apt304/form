@@ -1,10 +1,12 @@
 package form
 
 import (
+	"fmt"
 	"net/url"
 	"testing"
 	"time"
 
+	"github.com/gorilla/schema"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -309,4 +311,51 @@ func TestUnmarshal_StructPointer(t *testing.T) {
 func TestUnmarshal_NonStruct(t *testing.T) {
 	err := Unmarshal(url.Values{}, []string{})
 	assert.ErrorContains(t, err, "destination ([]string) must be a pointer to a struct", "unexpected error")
+}
+
+type BenchmarkForm struct {
+	ID    int      `form:"id" schema:"id"`
+	Name  string   `form:"name" schema:"name"`
+	Age   int      `form:"age" schema:"age"`
+	Slice []string `form:"slice" schema:"slice"`
+}
+
+func BenchmarkUnmarshal(b *testing.B) {
+	formData := map[string][]string{
+		"id":    {"123"},
+		"name":  {"John Doe"},
+		"age":   {"30"},
+		"slice": {"one", "two", "three"},
+	}
+
+	var benchmarkForm BenchmarkForm
+	for i := 0; i < b.N; i++ {
+		err := Unmarshal(formData, &benchmarkForm)
+		if err != nil {
+			b.Fatalf("Unmarshal failed: %v", err)
+		}
+	}
+	_ = fmt.Sprintf("%v", benchmarkForm)
+}
+
+func BenchmarkGorillaSchemaDecode(b *testing.B) {
+	formData := map[string][]string{
+		"id":    {"123"},
+		"name":  {"John Doe"},
+		"age":   {"30"},
+		"slice": {"one", "two", "three"},
+	}
+
+	// Set a Decoder instance as a test global, because it caches meta-data about structs, and an instance can be
+	// shared safely.
+	var decoder = schema.NewDecoder()
+
+	var benchmarkForm BenchmarkForm
+	for i := 0; i < b.N; i++ {
+		err := decoder.Decode(&benchmarkForm, formData)
+		if err != nil {
+			b.Fatalf("Unmarshal failed: %v", err)
+		}
+	}
+	_ = fmt.Sprintf("%v", benchmarkForm)
 }

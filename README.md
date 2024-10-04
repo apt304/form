@@ -56,6 +56,29 @@ func main() {
 }
 ```
 
+## Comparison to `gorilla/schema`
+
+`gorilla/schema` enables marshaling and unmarshaling form values to and from typed structs. However, it does not support dynamic fields that map key/value pairs. This library was created to extend the base functionality `gorilla/schema` provides by supporting the base typed struct conversion, as well as dynamic data pairs.
+
+## Benchmarks
+
+This library marshals and unmarshals form values to and from structs, much like `gorilla/schema`. Flat struct processing (without dynamic map fields) is compared between the two libraries.
+
+```shell
+go test -bench=. -benchtime 10s
+goos: darwin
+goarch: arm64
+pkg: github.com/apt304/form
+BenchmarkUnmarshal-10              	11018934	        1077 ns/op
+BenchmarkGorillaSchemaDecode-10    	 5794143	        2058 ns/op
+BenchmarkMarshal-10                	12946148	       922.5 ns/op
+BenchmarkGorillaSchemaEncode-10    	12842407	       935.8 ns/op
+PASS
+ok  	github.com/apt304/form	53.294s
+```
+
+_Benchmark run on Macbook Pro M1 Max_
+
 ## Contributions
 
 Contributions are welcome! Feel free to open issues or submit pull requests. For more information, please see [CONTRIBUTING.md](CONTRIBUTING.md).

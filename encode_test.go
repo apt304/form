@@ -2,6 +2,8 @@ package form
 
 import (
 	"errors"
+	"fmt"
+	"github.com/gorilla/schema"
 	"github.com/stretchr/testify/assert"
 	"math"
 	"net/url"
@@ -119,6 +121,50 @@ func TestMarshal(t *testing.T) {
 			}
 		})
 	}
+}
+
+func BenchmarkMarshal(b *testing.B) {
+	benchForm := BenchmarkForm{
+		ID:    123,
+		Name:  "John Doe",
+		Age:   30,
+		Slice: []string{"one", "two", "three"},
+	}
+
+	var out map[string][]string
+	for i := 0; i < b.N; i++ {
+		var err error
+		out, err = Marshal(benchForm)
+		if err != nil {
+			b.Fatalf("Unmarshal failed: %v", err)
+		}
+	}
+	_ = fmt.Sprintf("%s", out)
+}
+
+func BenchmarkGorillaSchemaEncode(b *testing.B) {
+	benchForm := BenchmarkForm{
+		ID:    123,
+		Name:  "John Doe",
+		Age:   30,
+		Slice: []string{"one", "two", "three"},
+	}
+
+	// Set a Decoder instance as a test global, because it caches meta-data about structs, and an instance can be
+	// shared safely.
+	var encoder = schema.NewEncoder()
+
+	// Define the map outside the benchmark loop to prevent compiler optimization from removing the allocation.
+	// form.Unmarshal allocates the map internally, so both have comparable allocations.
+	var out map[string][]string
+	for i := 0; i < b.N; i++ {
+		out = map[string][]string{}
+		err := encoder.Encode(benchForm, out)
+		if err != nil {
+			b.Fatalf("Unmarshal failed: %v", err)
+		}
+	}
+	_ = fmt.Sprintf("%s", out)
 }
 
 // FuzzStruct does not include time.Time or time.Duration values, as they are unlikely to round-trip marshal and
