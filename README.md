@@ -86,19 +86,26 @@ Unmarshal into:
 
 ## Benchmarks
 
-This library marshals and unmarshals form values to and from structs, much like `gorilla/schema`. Flat struct processing (without dynamic map fields) is compared between the two libraries.
+This library decodes and encodes form values to and from structs. Performance for flat struct processing is compared to `gorilla/schema`.
 
-```shell
-go test -bench=. -benchtime 10s
+- **Decode**: `apt304/form` decodes form values into structs faster than `gorilla/schema` and has fewer memory allocations.
+- **Encode**: Both libraries have comparable speed when encoding structs into form values. `gorilla/schema` encodes with fewer memory allocations.
+
+```sh
+go test -bench=. -benchtime 10s -benchmem
 goos: darwin
 goarch: arm64
 pkg: github.com/apt304/form
-BenchmarkUnmarshal-10              	11018934	        1077 ns/op
-BenchmarkGorillaSchemaDecode-10    	 5794143	        2058 ns/op
-BenchmarkMarshal-10                	12946148	       922.5 ns/op
-BenchmarkGorillaSchemaEncode-10    	12842407	       935.8 ns/op
+BenchmarkDecode-10                      	10825464	      1083   ns/op	     640 B/op	      17 allocs/op
+BenchmarkGorillaSchemaDecode-10         	 5848353	      2057   ns/op	    1104 B/op	      49 allocs/op
+BenchmarkDecodeLarge-10                 	 3880474	      3120   ns/op	     480 B/op	      40 allocs/op
+BenchmarkGorillaSchemaDecodeLarge-10    	 1000000	     11523   ns/op	    3392 B/op	     184 allocs/op
+BenchmarkEncode-10                      	12548168	       939.4 ns/op	     782 B/op	      22 allocs/op
+BenchmarkGorillaSchemaEncode-10         	13078416	       922.2 ns/op	     776 B/op	      19 allocs/op
+BenchmarkEncodeLarge-10                 	 2776134	      4310   ns/op	    4196 B/op	      81 allocs/op
+BenchmarkGorillaSchemaEncodeLarge-10    	 2687842	      4424   ns/op	    3831 B/op	      66 allocs/op
 PASS
-ok  	github.com/apt304/form	53.294s
+ok  	github.com/apt304/form	113.075s
 ```
 
 _Benchmark run on Macbook Pro M1 Max_

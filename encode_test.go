@@ -123,7 +123,7 @@ func TestMarshal(t *testing.T) {
 	}
 }
 
-func BenchmarkMarshal(b *testing.B) {
+func BenchmarkEncode(b *testing.B) {
 	benchForm := BenchmarkForm{
 		ID:    123,
 		Name:  "John Doe",
@@ -131,10 +131,9 @@ func BenchmarkMarshal(b *testing.B) {
 		Slice: []string{"one", "two", "three"},
 	}
 
-	var out map[string][]string
+	out := map[string][]string{}
 	for i := 0; i < b.N; i++ {
-		var err error
-		out, err = Marshal(benchForm)
+		err := NewEncoder(out).Encode(benchForm)
 		if err != nil {
 			b.Fatalf("Unmarshal failed: %v", err)
 		}
@@ -148,6 +147,81 @@ func BenchmarkGorillaSchemaEncode(b *testing.B) {
 		Name:  "John Doe",
 		Age:   30,
 		Slice: []string{"one", "two", "three"},
+	}
+
+	// Set a Decoder instance as a test global, because it caches meta-data about structs, and an instance can be
+	// shared safely.
+	var encoder = schema.NewEncoder()
+
+	// Define the map outside the benchmark loop to prevent compiler optimization from removing the allocation.
+	// form.Unmarshal allocates the map internally, so both have comparable allocations.
+	var out map[string][]string
+	for i := 0; i < b.N; i++ {
+		out = map[string][]string{}
+		err := encoder.Encode(benchForm, out)
+		if err != nil {
+			b.Fatalf("Unmarshal failed: %v", err)
+		}
+	}
+	_ = fmt.Sprintf("%s", out)
+}
+
+func BenchmarkEncodeLarge(b *testing.B) {
+	benchForm := BenchmarkFormLarge{
+		One:       "one",
+		Two:       "two",
+		Three:     "three",
+		Four:      "four",
+		Five:      "five",
+		Six:       "six",
+		Seven:     "seven",
+		Eight:     "eight",
+		Nine:      "nine",
+		Ten:       "ten",
+		Eleven:    "eleven",
+		Twelve:    "twelve",
+		Thirteen:  "thirteen",
+		Fourteen:  "fourteen",
+		Fifteen:   "fifteen",
+		Sixteen:   "sixteen",
+		Seventeen: "seventeen",
+		Eighteen:  "eighteen",
+		Nineteen:  "nineteen",
+		Twenty:    "twenty",
+	}
+
+	out := map[string][]string{}
+	for i := 0; i < b.N; i++ {
+		err := NewEncoder(out).Encode(benchForm)
+		if err != nil {
+			b.Fatalf("Unmarshal failed: %v", err)
+		}
+	}
+	_ = fmt.Sprintf("%s", out)
+}
+
+func BenchmarkGorillaSchemaEncodeLarge(b *testing.B) {
+	benchForm := BenchmarkFormLarge{
+		One:       "one",
+		Two:       "two",
+		Three:     "three",
+		Four:      "four",
+		Five:      "five",
+		Six:       "six",
+		Seven:     "seven",
+		Eight:     "eight",
+		Nine:      "nine",
+		Ten:       "ten",
+		Eleven:    "eleven",
+		Twelve:    "twelve",
+		Thirteen:  "thirteen",
+		Fourteen:  "fourteen",
+		Fifteen:   "fifteen",
+		Sixteen:   "sixteen",
+		Seventeen: "seventeen",
+		Eighteen:  "eighteen",
+		Nineteen:  "nineteen",
+		Twenty:    "twenty",
 	}
 
 	// Set a Decoder instance as a test global, because it caches meta-data about structs, and an instance can be

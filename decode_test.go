@@ -320,7 +320,7 @@ type BenchmarkForm struct {
 	Slice []string `form:"slice" schema:"slice"`
 }
 
-func BenchmarkUnmarshal(b *testing.B) {
+func BenchmarkDecode(b *testing.B) {
 	formData := map[string][]string{
 		"id":    {"123"},
 		"name":  {"John Doe"},
@@ -330,7 +330,7 @@ func BenchmarkUnmarshal(b *testing.B) {
 
 	var benchmarkForm BenchmarkForm
 	for i := 0; i < b.N; i++ {
-		err := Unmarshal(formData, &benchmarkForm)
+		err := NewDecoder(formData).Decode(&benchmarkForm)
 		if err != nil {
 			b.Fatalf("Unmarshal failed: %v", err)
 		}
@@ -351,6 +351,101 @@ func BenchmarkGorillaSchemaDecode(b *testing.B) {
 	var decoder = schema.NewDecoder()
 
 	var benchmarkForm BenchmarkForm
+	for i := 0; i < b.N; i++ {
+		err := decoder.Decode(&benchmarkForm, formData)
+		if err != nil {
+			b.Fatalf("Unmarshal failed: %v", err)
+		}
+	}
+	_ = fmt.Sprintf("%v", benchmarkForm)
+}
+
+type BenchmarkFormLarge struct {
+	One       string `form:"one" schema:"one"`
+	Two       string `form:"two" schema:"two"`
+	Three     string `form:"three" schema:"three"`
+	Four      string `form:"four" schema:"four"`
+	Five      string `form:"five" schema:"five"`
+	Six       string `form:"six" schema:"six"`
+	Seven     string `form:"seven" schema:"seven"`
+	Eight     string `form:"eight" schema:"eight"`
+	Nine      string `form:"nine" schema:"nine"`
+	Ten       string `form:"ten" schema:"ten"`
+	Eleven    string `form:"eleven" schema:"eleven"`
+	Twelve    string `form:"twelve" schema:"twelve"`
+	Thirteen  string `form:"thirteen" schema:"thirteen"`
+	Fourteen  string `form:"fourteen" schema:"fourteen"`
+	Fifteen   string `form:"fifteen" schema:"fifteen"`
+	Sixteen   string `form:"sixteen" schema:"sixteen"`
+	Seventeen string `form:"seventeen" schema:"seventeen"`
+	Eighteen  string `form:"eighteen" schema:"eighteen"`
+	Nineteen  string `form:"nineteen" schema:"nineteen"`
+	Twenty    string `form:"twenty" schema:"twenty"`
+}
+
+func BenchmarkDecodeLarge(b *testing.B) {
+	formData := map[string][]string{
+		"one":       {"one"},
+		"two":       {"two"},
+		"three":     {"three"},
+		"four":      {"four"},
+		"five":      {"five"},
+		"six":       {"six"},
+		"seven":     {"seven"},
+		"eight":     {"eight"},
+		"nine":      {"nine"},
+		"ten":       {"ten"},
+		"eleven":    {"eleven"},
+		"twelve":    {"twelve"},
+		"thirteen":  {"thirteen"},
+		"fourteen":  {"fourteen"},
+		"fifteen":   {"fifteen"},
+		"sixteen":   {"sixteen"},
+		"seventeen": {"seventeen"},
+		"eighteen":  {"eighteen"},
+		"nineteen":  {"nineteen"},
+		"twenty":    {"twenty"},
+	}
+
+	var benchmarkForm BenchmarkFormLarge
+	for i := 0; i < b.N; i++ {
+		err := NewDecoder(formData).Decode(&benchmarkForm)
+		if err != nil {
+			b.Fatalf("Unmarshal failed: %v", err)
+		}
+	}
+	_ = fmt.Sprintf("%v", benchmarkForm)
+}
+
+func BenchmarkGorillaSchemaDecodeLarge(b *testing.B) {
+	formData := map[string][]string{
+		"one":       {"one"},
+		"two":       {"two"},
+		"three":     {"three"},
+		"four":      {"four"},
+		"five":      {"five"},
+		"six":       {"six"},
+		"seven":     {"seven"},
+		"eight":     {"eight"},
+		"nine":      {"nine"},
+		"ten":       {"ten"},
+		"eleven":    {"eleven"},
+		"twelve":    {"twelve"},
+		"thirteen":  {"thirteen"},
+		"fourteen":  {"fourteen"},
+		"fifteen":   {"fifteen"},
+		"sixteen":   {"sixteen"},
+		"seventeen": {"seventeen"},
+		"eighteen":  {"eighteen"},
+		"nineteen":  {"nineteen"},
+		"twenty":    {"twenty"},
+	}
+
+	// Set a Decoder instance as a test global, because it caches meta-data about structs, and an instance can be
+	// shared safely.
+	var decoder = schema.NewDecoder()
+
+	var benchmarkForm BenchmarkFormLarge
 	for i := 0; i < b.N; i++ {
 		err := decoder.Decode(&benchmarkForm, formData)
 		if err != nil {
